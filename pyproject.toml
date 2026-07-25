@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = [
-    "faster-whisper>=1.1",
+    "faster-whisper>=1.2.1",
 ]
 
 [project.optional-dependencies]
