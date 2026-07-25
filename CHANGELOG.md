@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-25
+
+### Fixed
+
+- Package metadata declared the licence with `license = { file = "LICENSE" }`, which
+  embeds the entire licence text into the metadata field — PyPI rendered the whole MIT
+  body where the licence name belongs. It is now the SPDX expression `MIT`, with the
+  file carried separately via `license-files`.
+
+### Changed
+
+- Copyright is attributed to Habib Karataş rather than "cuewright contributors", and
+  the package declares an author.
+
 ## [0.1.0] — 2026-07-25
 
 First release.
@@ -33,5 +47,6 @@ First release.
   scoring fallback cut points so a number is never separated from its unit and a
   conjunction is never stranded at the end of a block.
 
-[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.1
 [0.1.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.0

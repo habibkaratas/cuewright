@@ -8,7 +8,7 @@ other, and what makes a translation edit cost nothing to re-render.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .burn import BurnStyle, burn
 from .check import SrtReport, check_srt
