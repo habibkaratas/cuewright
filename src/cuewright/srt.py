@@ -29,10 +29,12 @@ explicitly is still more reliable.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 __all__ = [
     "Cue",
+    "as_cue",
     "MAX_LINE",
     "MAX_LINES",
     "MAX_BLOCK",
@@ -325,6 +327,27 @@ def split_block(
     )
 
 
+def as_cue(item) -> Cue:
+    """Coerce a cue-like object into a :class:`Cue`.
+
+    Callers hand in whatever they have: a ``Cue``, a ``Segment`` from a
+    transcript, or a plain mapping. Accepting all three keeps the writers
+    usable from every stage of the pipeline — an earlier version only handled
+    the first two and broke ``transcribe``, which passes ``Segment`` objects.
+    """
+    if isinstance(item, Cue):
+        return item
+    if isinstance(item, Mapping):
+        return Cue(item["start"], item["end"], item["text"])
+    try:
+        return Cue(item.start, item.end, item.text)
+    except AttributeError as exc:  # pragma: no cover - defensive
+        raise TypeError(
+            f"expected a Cue, a mapping, or an object with start/end/text; "
+            f"got {type(item).__name__}"
+        ) from exc
+
+
 def write_srt(
     cues,
     path,
@@ -338,9 +361,8 @@ def write_srt(
     Returns the number of blocks written.
     """
     blocks: list[Cue] = []
-    for cue in cues:
-        if not isinstance(cue, Cue):
-            cue = Cue(cue["start"], cue["end"], cue["text"])
+    for item in cues:
+        cue = as_cue(item)
         blocks.extend(split_block(cue.text, cue.start, cue.end, lang=lang) if split else [cue])
 
     with open(path, "w", encoding=encoding, newline="\n") as fh:
@@ -366,7 +388,10 @@ def read_srt(path, encoding: str = "utf-8-sig") -> list[Cue]:
 
 def to_vtt(cues, path, encoding: str = "utf-8", *, lang: str | None = None) -> int:
     """Write cues as WebVTT, for browser-based players."""
-    blocks = [c for cue in cues for c in split_block(cue.text, cue.start, cue.end, lang=lang)]
+    blocks: list[Cue] = []
+    for item in cues:
+        cue = as_cue(item)
+        blocks.extend(split_block(cue.text, cue.start, cue.end, lang=lang))
     with open(path, "w", encoding=encoding, newline="\n") as fh:
         fh.write("WEBVTT\n\n")
         for i, cue in enumerate(blocks, 1):

@@ -7,6 +7,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-25
+
+### Fixed
+
+- **`transcribe` did not work at all.** `write_srt` assumed every item was a `Cue`
+  or a mapping and subscripted anything else, but the command passes `Segment`
+  objects, so it failed with `TypeError: 'Segment' object is not subscriptable`.
+  The bug was present in every release to date. `write_srt` and `to_vtt` now accept
+  a `Cue`, a `Segment`, or any mapping, via the new `as_cue` helper, and raise a
+  useful `TypeError` for anything else.
+
+### Added
+
+- CI transcribes real speech end to end: espeak-ng synthesises a clip, the `tiny`
+  model transcribes it, and the resulting SRT and segment file are validated. The
+  flagship command shipped broken because nothing in CI ever ran it — the unit
+  tests do not touch a model and the burn test does not need one.
+- Unit coverage for the writers' type contract, so this class of mistake fails in
+  under a second rather than in a release.
+
 ## [0.2.0] — 2026-07-25
 
 ### Added
@@ -72,7 +92,8 @@ First release.
   scoring fallback cut points so a number is never separated from its unit and a
   conjunction is never stranded at the end of a block.
 
-[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.1
 [0.2.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.0
 [0.1.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.1
 [0.1.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.0

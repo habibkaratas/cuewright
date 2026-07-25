@@ -63,8 +63,9 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ffmpeg and a speech synthesiser
+        # espeak-ng gives the transcription step some real speech to chew on.
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
 
       - name: Install
         run: pip install -e ".[dev]"
@@ -80,3 +81,26 @@ jobs:
           cuewright check subs.srt
           cuewright burn clip.mp4 subs.srt out.mp4
           test -s out.mp4
+
+      - name: Transcribe real speech end to end
+        # The flagship command once shipped broken because nothing here ever
+        # ran it: the unit tests do not touch the model and the burn test does
+        # not need one. Downloading `tiny` is a small price for covering the
+        # whole path — decode, transcribe, write SRT, write segments.json.
+        run: |
+          espeak-ng -w speech.wav -s 130 \
+            "The quick brown fox jumps over the lazy dog. \
+             Flat glass is one of the most important materials in construction."
+          cuewright transcribe speech.wav --model tiny --language en --tag en
+          test -s speech.en.srt
+          test -s speech.en.segments.json
+          cuewright check speech.en.srt
+          cuewright verify speech.en.segments.json || true
+          python - <<'PY'
+          from cuewright.segments import SegmentFile
+          from cuewright.srt import read_srt
+          transcript = SegmentFile.load("speech.en.segments.json")
+          assert transcript.segments, "transcription produced no segments"
+          assert read_srt("speech.en.srt"), "no cues were written"
+          print(f"{len(transcript.segments)} segments, language={transcript.language}")
+          PY
