@@ -1,0 +1,42 @@
+# Media — the working files a user drops in, never the repo's business
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.m4v
+*.wav
+*.mp3
+*.m4a
+*.flac
+
+# Generated subtitle artefacts
+*.srt
+*.vtt
+*.segments.json
+!tests/**/*.srt
+
+# Bundled ffmpeg builds
+tools/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.eggs/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

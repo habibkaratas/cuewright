@@ -1,0 +1,18 @@
+# Normalise line endings in the repository; check out native on each platform.
+* text=auto
+
+*.py    text diff=python
+*.md    text
+*.toml  text
+*.yml   text
+*.yaml  text
+Makefile text
+
+# Subtitle fixtures are compared byte for byte in tests — never rewrite them.
+*.srt   text eol=lf
+*.vtt   text eol=lf
+
+*.png   binary
+*.jpg   binary
+*.mp4   binary
+*.wav   binary

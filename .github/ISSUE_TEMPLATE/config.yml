@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/habibkaratas/subforge/discussions
+    about: For usage questions and open-ended discussion.
+  - name: Transcription accuracy
+    url: https://github.com/SYSTRAN/faster-whisper
+    about: >
+      Mishearings come from the Whisper model, not from subforge. Try a larger
+      model or report upstream. `subforge compare` helps narrow down where.

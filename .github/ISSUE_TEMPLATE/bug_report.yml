@@ -1,0 +1,64 @@
+name: Bug report
+description: Something produced the wrong result or crashed
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Transcription quality issues are usually easier to diagnose with the
+        output of `subforge verify` and `subforge check`, so please include
+        them where relevant.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Commands you ran
+      description: The exact `subforge` invocations, in order.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Error message or unexpected output. Full traceback if it crashed.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: subforge version
+      description: Output of `subforge --version`
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version and OS
+      placeholder: "3.12.4, Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: ffmpeg
+    attributes:
+      label: ffmpeg version
+      description: Output of `ffmpeg -version` (first line). Leave blank if unrelated.
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Media details
+      description: >
+        Duration, language, and `ffprobe` output if the problem involves a
+        specific file. Please do not attach copyrighted material.
