@@ -1,8 +1,7 @@
 # subforge
 
 [![CI](https://github.com/habibkaratas/subforge/actions/workflows/ci.yml/badge.svg)](https://github.com/habibkaratas/subforge/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/subforge)](https://pypi.org/project/subforge/)
-[![Python](https://img.shields.io/pypi/pyversions/subforge)](https://pypi.org/project/subforge/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Transcribe speech, translate it, and produce subtitles you can actually trust.
@@ -19,8 +18,11 @@ watches the whole video. `subforge` ships the checks that narrow down where to l
 ## Install
 
 ```bash
-pip install subforge
+pip install git+https://github.com/habibkaratas/subforge
 ```
+
+> Not on PyPI: the name `subforge` is already taken there by an unrelated package,
+> so install from this repository rather than with a bare `pip install subforge`.
 
 Requires Python 3.10+ and [ffmpeg](https://ffmpeg.org/) on `PATH`.
 

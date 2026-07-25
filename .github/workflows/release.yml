@@ -45,15 +45,7 @@ jobs:
           generate_release_notes: true
           files: dist/*
 
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write   # trusted publishing, no API token needed
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+# No PyPI publish step: the name "subforge" is taken on PyPI by an unrelated
+# package. Distribution is via GitHub releases and `pip install git+https://...`.
+# To publish, rename the project in pyproject.toml first, then add a job using
+# pypa/gh-action-pypi-publish with `permissions: id-token: write`.

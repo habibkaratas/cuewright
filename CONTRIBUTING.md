@@ -60,5 +60,9 @@ oversells itself is worse than no check, because it invites misplaced confidence
 ## Releasing
 
 Maintainers: bump `__version__` in `src/subforge/__init__.py`, update `CHANGELOG.md`,
-then tag `vX.Y.Z`. The release workflow verifies the tag matches the version, builds,
-drafts a GitHub release and publishes to PyPI via trusted publishing.
+then tag `vX.Y.Z`. The release workflow verifies the tag matches the version, builds
+the sdist and wheel, and drafts a GitHub release with them attached.
+
+There is no PyPI step: `subforge` is taken on PyPI by an unrelated package, so the
+distribution channel is GitHub releases and `pip install git+https://…`. Publishing
+would mean renaming the project first.
