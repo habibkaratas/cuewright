@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .srt import MAX_BLOCK, MAX_LINE, MAX_LINES, parse_timestamp
+from .srt import MAX_LINE, MAX_LINES, line_budget, parse_timestamp
 
 __all__ = ["SrtReport", "check_srt"]
 
@@ -22,18 +22,26 @@ class SrtReport:
     max_line: int = 0
     max_block: int = 0
     min_duration: float = 0.0
+    # Width limits depend on the script: CJK glyphs are full-width, so far
+    # fewer fit on a line. Recorded here so the report explains what it judged
+    # against rather than implying one universal number.
+    line_limit: int = MAX_LINE
     problems: list[str] = field(default_factory=list)
 
     @property
+    def block_limit(self) -> int:
+        return self.line_limit * MAX_LINES
+
+    @property
     def ok(self) -> bool:
-        return not self.problems and self.max_block <= MAX_BLOCK
+        return not self.problems and self.max_block <= self.block_limit
 
     @property
     def wide_lines(self) -> bool:
-        return self.max_line > MAX_LINE
+        return self.max_line > self.line_limit
 
 
-def check_srt(path, encoding: str = "utf-8-sig") -> SrtReport:
+def check_srt(path, encoding: str = "utf-8-sig", *, lang: str | None = None) -> SrtReport:
     report = SrtReport(path=str(path))
     raw = open(path, encoding=encoding).read().strip()
     if not raw:
@@ -42,6 +50,9 @@ def check_srt(path, encoding: str = "utf-8-sig") -> SrtReport:
 
     blocks = re.split(r"\n\s*\n", raw)
     report.blocks = len(blocks)
+    # Judge widths against the script actually used, guessing from the text
+    # when the caller did not say which language this is.
+    report.line_limit = line_budget(lang, raw)
     previous_end = -1.0
     shortest = float("inf")
 
@@ -82,6 +93,8 @@ def check_srt(path, encoding: str = "utf-8-sig") -> SrtReport:
         report.max_block = max(report.max_block, sum(len(ln) for ln in text))
 
     report.min_duration = 0.0 if shortest == float("inf") else shortest
-    if report.max_block > MAX_BLOCK:
-        report.problems.append(f"longest block is {report.max_block} chars (max {MAX_BLOCK})")
+    if report.max_block > report.block_limit:
+        report.problems.append(
+            f"longest block is {report.max_block} chars (max {report.block_limit})"
+        )
     return report

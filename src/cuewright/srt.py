@@ -2,11 +2,28 @@
 
 Two constraints drive everything here:
 
-* A subtitle block should not exceed two lines of ~42 characters. Longer blocks
-  either overflow the frame or force the viewer to read faster than they can.
+* A subtitle block should not exceed two lines. Longer blocks either overflow
+  the frame or force the viewer to read faster than they can.
 * Splitting a long segment must not break a number from its unit ("400 |
   metre") or strand a conjunction at the end of a block. :func:`split_block`
   scores candidate cut points to avoid both.
+
+Both constraints are language-dependent, so the formatting functions take a
+``lang`` hint:
+
+* **Line budget.** 42 characters suits Latin, Cyrillic, Arabic and similar
+  scripts. CJK glyphs are full-width, so roughly half as many fit — the budget
+  drops to 20 for those.
+* **Word boundaries.** Chinese, Japanese, Thai and their neighbours do not put
+  spaces between words. Wrapping them on spaces yields one endless line, so
+  those scripts wrap on characters instead, preferring to break after
+  punctuation.
+* **Function words.** Which conjunctions and particles read badly at the end of
+  a block is per-language; see :data:`FUNCTION_WORDS`.
+
+When ``lang`` is omitted the script is guessed from the text, which covers the
+common case without the caller threading a language code through. Passing it
+explicitly is still more reliable.
 """
 
 from __future__ import annotations
@@ -19,8 +36,12 @@ __all__ = [
     "MAX_LINE",
     "MAX_LINES",
     "MAX_BLOCK",
+    "CJK_MAX_LINE",
+    "NO_SPACE_LANGS",
+    "FUNCTION_WORDS",
     "format_timestamp",
     "parse_timestamp",
+    "line_budget",
     "wrap",
     "split_block",
     "write_srt",
@@ -32,20 +53,97 @@ MAX_LINE = 42
 MAX_LINES = 2
 MAX_BLOCK = MAX_LINE * MAX_LINES
 
-# Preference order for a cut: sentence end, then clause, then dash.
-BREAKS = (". ", "؟ ", "! ", "? ", "؛ ", "; ", ": ", "، ", ", ", " — ", " - ")
+# CJK glyphs occupy roughly two Latin character widths, so a line holds fewer.
+CJK_MAX_LINE = 20
 
-# Words that read badly when left dangling at the end of a block.
-FUNCTION_WORDS = frozenset(
-    """
-    ve ile veya ya ki da de hem için olarak gibi ama fakat çünkü
-    and or the a an of to in on at by as for from with that which but
-    في من إلى على أن إن عن مع بين التي الذي
-""".split()
+# Scripts written without spaces between words. Wrapping these on whitespace
+# yields a single unbreakable line, so they are wrapped per character.
+NO_SPACE_LANGS = frozenset({"zh", "yue", "ja", "th", "lo", "my", "km", "bo"})
+
+# Languages whose glyphs are full-width.
+WIDE_LANGS = frozenset({"zh", "yue", "ja", "ko"})
+
+# Preference order for a cut: sentence end, then clause, then dash.
+BREAKS = (
+    ". ",
+    "! ",
+    "? ",
+    "。",  # CJK sentence end — no trailing space
+    "！",
+    "？",
+    "؟ ",  # Arabic
+    "۔ ",  # Urdu
+    "; ",
+    ": ",
+    "؛ ",
+    "、",
+    "；",
+    "：",
+    ", ",
+    "، ",
+    " — ",
+    " - ",
 )
+
+# Words that read badly when left dangling at the end of a block. Kept per
+# language: a Turkish list applied to English would strand the wrong words.
+FUNCTION_WORDS: dict[str, frozenset[str]] = {
+    "tr": frozenset(
+        """
+        ve ile veya ya ki da de hem için olarak gibi ama fakat çünkü ancak
+        yani ise diye kadar göre üzere rağmen
+        """.split()
+    ),
+    "en": frozenset(
+        """
+        and or the a an of to in on at by as for from with that which but
+        into over under about between during than then so if because while
+        """.split()
+    ),
+    "ar": frozenset(
+        """
+        في من إلى على أن إن عن مع بين التي الذي ما لا و أو ثم بل لكن حتى
+        عند بعد قبل خلال حول ضد نحو منذ
+        """.split()
+    ),
+    "de": frozenset(
+        """
+        und oder der die das ein eine von zu in an auf mit für als bei aus
+        nach über unter durch gegen ohne um dass weil aber
+        """.split()
+    ),
+    "fr": frozenset(
+        """
+        et ou le la les un une de du des à au aux en dans sur pour par avec
+        que qui mais donc car ni comme sans sous entre
+        """.split()
+    ),
+    "es": frozenset(
+        """
+        y o el la los las un una de del a en con por para que quien pero
+        como sin sobre entre desde hasta
+        """.split()
+    ),
+    "ru": frozenset(
+        """
+        и или в на с по для от до из за под над о об к у не что как но
+        если чтобы при между через
+        """.split()
+    ),
+}
+
+# Used when the language is unknown: the union. A blunt instrument, but still
+# better than stranding a conjunction.
+_ALL_FUNCTION_WORDS = frozenset().union(*FUNCTION_WORDS.values())
 
 _NUMERIC = re.compile(r"^[\d.,٪%]+$")
 _TIMESTAMP = re.compile(r"(\d+):(\d{2}):(\d{2})[,.](\d{1,3})")
+
+# CJK ideographs, kana, Hangul, Thai, Lao, Myanmar, Khmer, Tibetan.
+_WIDE_SCRIPT = re.compile("[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯฀-๿຀-໿က-႟ក-៿ༀ-࿿]")
+
+# Characters it is acceptable to break immediately after in a space-less script.
+_CJK_BREAK_AFTER = frozenset("。！？、；：，)）」』】〉》…・")
 
 
 @dataclass(frozen=True)
@@ -78,12 +176,71 @@ def parse_timestamp(text: str) -> float:
     return int(h) * 3600 + int(mins) * 60 + int(s) + int(frac.ljust(3, "0")) / 1000
 
 
-def wrap(text: str, max_line: int = MAX_LINE, max_lines: int = MAX_LINES) -> str:
-    """Wrap on word boundaries into at most ``max_lines`` lines.
+def _looks_spaceless(text: str) -> bool:
+    """Guess whether the text is written without word spaces."""
+    stripped = text.strip()
+    if not stripped:
+        return False
+    wide = len(_WIDE_SCRIPT.findall(stripped))
+    return wide >= max(4, len(stripped) * 0.3) and text.count(" ") < len(stripped) / 8
+
+
+def _spaceless(text: str, lang: str | None) -> bool:
+    return lang in NO_SPACE_LANGS if lang else _looks_spaceless(text)
+
+
+def line_budget(lang: str | None = None, text: str = "") -> int:
+    """How many characters fit on one line for this language."""
+    if lang:
+        return CJK_MAX_LINE if lang in WIDE_LANGS or lang in NO_SPACE_LANGS else MAX_LINE
+    return CJK_MAX_LINE if _looks_spaceless(text) else MAX_LINE
+
+
+def _function_words(lang: str | None) -> frozenset[str]:
+    if lang and lang in FUNCTION_WORDS:
+        return FUNCTION_WORDS[lang]
+    return _ALL_FUNCTION_WORDS
+
+
+def _wrap_spaceless(text: str, max_line: int, max_lines: int) -> str:
+    """Wrap a space-less script on characters, preferring to break after
+    punctuation so a clause is not severed mid-phrase."""
+    text = text.strip()
+    lines: list[str] = []
+    rest = text
+    while rest and len(lines) < max_lines - 1 and len(rest) > max_line:
+        window = rest[:max_line]
+        cut = max_line
+        floor = max(1, int(max_line * 0.4))
+        for i in range(len(window) - 1, floor - 1, -1):
+            if window[i] in _CJK_BREAK_AFTER:
+                cut = i + 1
+                break
+        lines.append(rest[:cut])
+        rest = rest[cut:]
+    if rest:
+        lines.append(rest)
+    return "\n".join(lines)
+
+
+def wrap(
+    text: str,
+    max_line: int | None = None,
+    max_lines: int = MAX_LINES,
+    *,
+    lang: str | None = None,
+) -> str:
+    """Wrap into at most ``max_lines`` lines.
 
     Anything that still does not fit is appended to the final line rather than
     dropped — a subtitle that is slightly too wide beats one missing words.
     """
+    if max_line is None:
+        max_line = line_budget(lang, text)
+
+    if _spaceless(text, lang):
+        return _wrap_spaceless(text, max_line, max_lines)
+
     words = text.split()
     if not words:
         return text
@@ -108,7 +265,7 @@ def wrap(text: str, max_line: int = MAX_LINE, max_lines: int = MAX_LINES) -> str
     return "\n".join(lines)
 
 
-def _cut_score(text: str, pos: int, mid: float) -> float:
+def _cut_score(text: str, pos: int, mid: float, lang: str | None) -> float:
     """Lower is better. Penalises cuts that separate a number from its unit."""
     score = abs(pos - mid)
     before = text[:pos].split()
@@ -116,14 +273,23 @@ def _cut_score(text: str, pos: int, mid: float) -> float:
         last = before[-1].strip(".,;:،؛").lower()
         if _NUMERIC.match(last):
             score += 1000
-        elif last in FUNCTION_WORDS:
+        elif last in _function_words(lang):
             score += 500
     return score
 
 
-def split_block(text: str, start: float, end: float, max_chars: int = MAX_BLOCK) -> list[Cue]:
+def split_block(
+    text: str,
+    start: float,
+    end: float,
+    max_chars: int | None = None,
+    *,
+    lang: str | None = None,
+) -> list[Cue]:
     """Split an over-long segment into cues, apportioning time by length."""
     text = text.strip()
+    if max_chars is None:
+        max_chars = line_budget(lang, text) * MAX_LINES
     if len(text) <= max_chars:
         return [Cue(start, end, text)]
 
@@ -139,22 +305,34 @@ def split_block(text: str, start: float, end: float, max_chars: int = MAX_BLOCK)
             break
 
     if cut is None:
-        spaces = [i for i, c in enumerate(text) if c == " " and lo < i < hi]
-        if not spaces:
-            return [Cue(start, end, text)]
-        cut = min(spaces, key=lambda p: _cut_score(text, p, mid))
+        if _spaceless(text, lang):
+            # No spaces to cut on: prefer a punctuation mark, else the midpoint.
+            marks = [i + 1 for i, c in enumerate(text) if c in _CJK_BREAK_AFTER and lo < i < hi]
+            cut = min(marks, key=lambda p: abs(p - mid)) if marks else int(mid)
+        else:
+            spaces = [i for i, c in enumerate(text) if c == " " and lo < i < hi]
+            if not spaces:
+                return [Cue(start, end, text)]
+            cut = min(spaces, key=lambda p: _cut_score(text, p, mid, lang))
 
     left, right = text[:cut].strip(), text[cut:].strip()
     if not left or not right:
         return [Cue(start, end, text)]
 
     boundary = start + (end - start) * (len(left) / (len(left) + len(right)))
-    return split_block(left, start, boundary, max_chars) + split_block(
-        right, boundary, end, max_chars
+    return split_block(left, start, boundary, max_chars, lang=lang) + split_block(
+        right, boundary, end, max_chars, lang=lang
     )
 
 
-def write_srt(cues, path, *, split: bool = True, encoding: str = "utf-8-sig") -> int:
+def write_srt(
+    cues,
+    path,
+    *,
+    split: bool = True,
+    encoding: str = "utf-8-sig",
+    lang: str | None = None,
+) -> int:
     """Write cues to an SRT file, optionally splitting over-long blocks.
 
     Returns the number of blocks written.
@@ -163,13 +341,13 @@ def write_srt(cues, path, *, split: bool = True, encoding: str = "utf-8-sig") ->
     for cue in cues:
         if not isinstance(cue, Cue):
             cue = Cue(cue["start"], cue["end"], cue["text"])
-        blocks.extend(split_block(cue.text, cue.start, cue.end) if split else [cue])
+        blocks.extend(split_block(cue.text, cue.start, cue.end, lang=lang) if split else [cue])
 
     with open(path, "w", encoding=encoding, newline="\n") as fh:
         for i, cue in enumerate(blocks, 1):
             fh.write(
                 f"{i}\n{format_timestamp(cue.start)} --> "
-                f"{format_timestamp(cue.end)}\n{wrap(cue.text)}\n\n"
+                f"{format_timestamp(cue.end)}\n{wrap(cue.text, lang=lang)}\n\n"
             )
     return len(blocks)
 
@@ -186,14 +364,14 @@ def read_srt(path, encoding: str = "utf-8-sig") -> list[Cue]:
     return cues
 
 
-def to_vtt(cues, path, encoding: str = "utf-8") -> int:
+def to_vtt(cues, path, encoding: str = "utf-8", *, lang: str | None = None) -> int:
     """Write cues as WebVTT, for browser-based players."""
+    blocks = [c for cue in cues for c in split_block(cue.text, cue.start, cue.end, lang=lang)]
     with open(path, "w", encoding=encoding, newline="\n") as fh:
         fh.write("WEBVTT\n\n")
-        blocks = [c for cue in cues for c in split_block(cue.text, cue.start, cue.end)]
         for i, cue in enumerate(blocks, 1):
             fh.write(
                 f"{i}\n{format_timestamp(cue.start, '.')} --> "
-                f"{format_timestamp(cue.end, '.')}\n{wrap(cue.text)}\n\n"
+                f"{format_timestamp(cue.end, '.')}\n{wrap(cue.text, lang=lang)}\n\n"
             )
     return len(blocks)

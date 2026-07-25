@@ -14,7 +14,7 @@ tracks stay frame-accurate with each other because none of them invents its own 
 
 The other half of the project is verification. Machine transcription fails quietly —
 a dropped sentence or a misheard word looks exactly like a correct one until someone
-watches the whole video. `cuewright` ships the checks that narrow down where to look.
+watches the whole video. cuewright ships the checks that narrow down where to look.
 
 ## Install
 
@@ -116,11 +116,28 @@ cuewright check video.tr.srt
 
 ## Subtitle formatting
 
-Cues are wrapped to two lines of ~42 characters. Segments longer than that are split
-into several cues with time apportioned by length, preferring sentence and clause
-boundaries. When no punctuation is available the splitter scores candidate positions
-so it will not separate a number from its unit (`400 | metre`) or strand a
-conjunction at the end of a block.
+Cues are wrapped to two lines. Segments longer than that are split into several cues
+with time apportioned by length, preferring sentence and clause boundaries. When no
+punctuation is available the splitter scores candidate positions so it will not
+separate a number from its unit (`400 | metre`) or strand a conjunction at the end of
+a block.
+
+Formatting is language-aware, because none of those rules are universal:
+
+- **Line width** is 42 characters for Latin, Cyrillic and Arabic script, and 20 for
+  full-width scripts (`zh` `yue` `ja` `ko` `th` `lo` `my` `km` `bo`).
+- **Space-less scripts** — Chinese, Japanese, Thai and their neighbours — wrap per
+  character rather than per word, breaking after punctuation where possible. Wrapping
+  them on spaces would produce one unbreakable line.
+- **Function words** that may not end a block are curated for `tr` `en` `ar` `de`
+  `fr` `es` `ru`; other languages fall back to the union of those lists.
+
+Tell it the language with `--lang` on `build` and `check`; `transcribe` and `export`
+take it from the segment file. Omitting it is safe — the script is guessed from the
+text — but an explicit code gives better splits.
+
+See [docs/LANGUAGES.md](docs/LANGUAGES.md) for the full picture, including which
+languages the transcriber handles and how to add one to the formatter.
 
 ## Using it as a library
 

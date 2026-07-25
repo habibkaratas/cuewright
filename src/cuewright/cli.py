@@ -66,7 +66,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
     tag = args.tag or (result.language or "src")
     srt_path = out_dir / f"{stem}.{tag}.srt"
     json_path = out_dir / f"{stem}.{tag}.segments.json"
-    blocks = write_srt(result.segments, srt_path)
+    blocks = write_srt(result.segments, srt_path, lang=result.language)
     result.save(json_path)
 
     minutes = (time.monotonic() - started) / 60
@@ -91,10 +91,13 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     cues = [Cue(s.start, s.end, translations[s.id]) for s in segments.segments]
     out = Path(args.output)
+    # The target language, not the segment file's: formatting follows the
+    # language being written, and a translation is by definition a different one.
+    lang = args.lang
     if out.suffix.lower() == ".vtt":
-        blocks = to_vtt(cues, out)
+        blocks = to_vtt(cues, out, lang=lang)
     else:
-        blocks = write_srt(cues, out)
+        blocks = write_srt(cues, out, lang=lang)
     print(f"{len(cues)} segments -> {blocks} cues -> {out}")
     return 0
 
@@ -109,7 +112,12 @@ def cmd_export(args: argparse.Namespace) -> int:
     segments = SegmentFile.load(args.segments)
     cues = [Cue(s.start, s.end, s.text) for s in segments.segments]
     out = Path(args.output)
-    blocks = to_vtt(cues, out) if out.suffix.lower() == ".vtt" else write_srt(cues, out)
+    lang = args.lang or segments.language or None
+    blocks = (
+        to_vtt(cues, out, lang=lang)
+        if out.suffix.lower() == ".vtt"
+        else write_srt(cues, out, lang=lang)
+    )
     print(f"{blocks} cues -> {out}")
     return 0
 
@@ -230,7 +238,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     failures = 0
     for path in args.subtitles:
-        report = check_srt(path)
+        report = check_srt(path, lang=args.lang)
         status = "OK    " if report.ok else "FAILED"
         print(f"{status} {report.path}")
         print(
@@ -239,7 +247,10 @@ def cmd_check(args: argparse.Namespace) -> int:
             f"| shortest cue {report.min_duration:.2f}s"
         )
         if report.wide_lines:
-            print("       note: some lines exceed the 42-character guideline")
+            print(
+                f"       note: some lines exceed the {report.line_limit}-character "
+                f"guideline for this script"
+            )
         for problem in report.problems[:10]:
             print(f"       - {problem}")
         failures += 0 if report.ok else 1
@@ -293,11 +304,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("segments")
     p.add_argument("translation")
     p.add_argument("output")
+    p.add_argument(
+        "--lang",
+        default=None,
+        help="target language code (e.g. tr, ja). Tunes line width, word "
+        "breaking and which function words may end a block. Guessed from the "
+        "text when omitted.",
+    )
     p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("export", help="segments -> SRT/VTT in the source language")
     p.add_argument("segments")
     p.add_argument("output")
+    p.add_argument(
+        "--lang", default=None, help="override the segment file's language for formatting"
+    )
     p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("burn", help="render subtitles into the picture")
@@ -326,6 +347,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("check", help="validate SRT structure")
     p.add_argument("subtitles", nargs="+")
+    p.add_argument(
+        "--lang",
+        default=None,
+        help="language code, so widths are judged against the right script "
+        "(CJK lines hold about half as many characters)",
+    )
     p.set_defaults(func=cmd_check)
 
     return parser

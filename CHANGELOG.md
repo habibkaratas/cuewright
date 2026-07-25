@@ -7,6 +7,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-25
+
+### Added
+
+- Language-aware subtitle formatting. `wrap`, `split_block`, `write_srt`, `to_vtt`
+  and `check_srt` take a `lang` hint, and `build`, `export` and `check` expose it as
+  `--lang`. When omitted the script is guessed from the text.
+- `docs/LANGUAGES.md`, setting out what each stage actually supports: 100 languages
+  for transcription, unlimited for translation, and per-language tuning with
+  documented fallbacks for formatting.
+
+### Fixed
+
+- Chinese, Japanese, Cantonese, Thai, Lao, Burmese, Khmer and Tibetan produced one
+  unbreakable line per segment. These scripts have no spaces between words, so
+  whitespace wrapping never found a break point. They now wrap per character,
+  preferring to break after punctuation.
+- Full-width scripts were measured against the 42-character budget meant for
+  half-width glyphs, so lines overflowed the frame. `zh` `yue` `ja` `ko` and the
+  space-less scripts now use a 20-character budget, and `check` reports widths
+  against the right limit.
+- The list of function words that may not end a block was a single mixed set of
+  Turkish, English and Arabic applied to every language. It is now per-language,
+  with curated lists for `tr` `en` `ar` `de` `fr` `es` `ru`.
+
 ## [0.1.1] — 2026-07-25
 
 ### Fixed
@@ -47,6 +72,7 @@ First release.
   scoring fallback cut points so a number is never separated from its unit and a
   conjunction is never stranded at the end of a block.
 
-[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.0
 [0.1.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.1
 [0.1.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.0
