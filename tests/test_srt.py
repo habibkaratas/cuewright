@@ -13,7 +13,7 @@ from itertools import pairwise
 
 import pytest
 
-from subforge.srt import (
+from cuewright.srt import (
     MAX_BLOCK,
     MAX_LINES,
     Cue,

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from subforge.segments import Segment, SegmentFile, TranslationError, load_translation
+from cuewright.segments import Segment, SegmentFile, TranslationError, load_translation
 
 
 @pytest.fixture

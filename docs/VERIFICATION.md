@@ -10,7 +10,7 @@ These tools do not replace that. What they do is **narrow down where to look** �
 
 Transcription goes wrong in two distinct ways, and each needs a different check.
 
-## 1. Dropped speech — `subforge verify`
+## 1. Dropped speech — `cuewright verify`
 
 Voice-activity detection is what stops Whisper hallucinating over silence, but it
 sometimes classifies quiet speech as silence and removes it. The transcript then has a
@@ -21,7 +21,7 @@ with ffmpeg's `volumedetect`. A gap that is genuinely silent is fine. A gap carr
 speech-level audio is a candidate for dropped narration.
 
 ```bash
-subforge verify video.ar.segments.json video.mp4
+cuewright verify video.ar.segments.json video.mp4
 ```
 
 ```
@@ -46,7 +46,7 @@ It also reports per-segment anomalies computed from the data alone:
 | `slow` | Under 3 characters/second across a long segment — text may be missing |
 | `long` | Over 15 seconds — should be split into more cues |
 
-## 2. Misheard words — `subforge compare`
+## 2. Misheard words — `cuewright compare`
 
 Decode the same audio twice with different settings, then diff the results. Where the
 two passes agree, the transcript is dependable. Where they diverge, the model was
@@ -56,8 +56,8 @@ The usual second pass disables voice-activity filtering, since that changes what
 decoder sees without changing the model:
 
 ```bash
-subforge transcribe video.mp4 --language ar --no-vad --tag check
-subforge compare video.ar.segments.json video.check.segments.json
+cuewright transcribe video.mp4 --language ar --no-vad --tag check
+cuewright compare video.ar.segments.json video.check.segments.json
 ```
 
 ```
@@ -95,14 +95,14 @@ To get a genuinely independent opinion you need a different model — run the se
 pass with `--model medium` against a `large-v3` first pass, and expect more noise in
 the diff in exchange for real independence.
 
-## 3. Structural validity — `subforge check`
+## 3. Structural validity — `cuewright check`
 
 The transcript can be perfect and the file still broken. `check` validates the SRT
 itself: sequential numbering, timings that run forwards, cues that do not overlap,
 at most two lines per block, and block widths that fit the frame.
 
 ```bash
-subforge check video.tr.srt video.en.srt
+cuewright check video.tr.srt video.en.srt
 ```
 
 ```

@@ -1,7 +1,8 @@
-# subforge
+# cuewright
 
-[![CI](https://github.com/habibkaratas/subforge/actions/workflows/ci.yml/badge.svg)](https://github.com/habibkaratas/subforge/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
+[![CI](https://github.com/habibkaratas/cuewright/actions/workflows/ci.yml/badge.svg)](https://github.com/habibkaratas/cuewright/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/cuewright)](https://pypi.org/project/cuewright/)
+[![Python](https://img.shields.io/pypi/pyversions/cuewright)](https://pypi.org/project/cuewright/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Transcribe speech, translate it, and produce subtitles you can actually trust.
@@ -13,16 +14,13 @@ tracks stay frame-accurate with each other because none of them invents its own 
 
 The other half of the project is verification. Machine transcription fails quietly —
 a dropped sentence or a misheard word looks exactly like a correct one until someone
-watches the whole video. `subforge` ships the checks that narrow down where to look.
+watches the whole video. `cuewright` ships the checks that narrow down where to look.
 
 ## Install
 
 ```bash
-pip install git+https://github.com/habibkaratas/subforge
+pip install cuewright
 ```
-
-> Not on PyPI: the name `subforge` is already taken there by an unrelated package,
-> so install from this repository rather than with a bare `pip install subforge`.
 
 Requires Python 3.10+ and [ffmpeg](https://ffmpeg.org/) on `PATH`.
 
@@ -32,8 +30,8 @@ macOS   : brew install ffmpeg
 Debian  : sudo apt install ffmpeg
 ```
 
-If ffmpeg lives somewhere unusual, point at it with `SUBFORGE_FFMPEG` (and
-`SUBFORGE_FFPROBE`). A static build unpacked into `tools/` is also found automatically.
+If ffmpeg lives somewhere unusual, point at it with `CUEWRIGHT_FFMPEG` (and
+`CUEWRIGHT_FFPROBE`). A static build unpacked into `tools/` is also found automatically.
 
 ## Quick start
 
@@ -41,18 +39,18 @@ Turning an Arabic-language video into Turkish subtitles:
 
 ```bash
 # 1. Transcribe. Writes video.ar.srt and video.ar.segments.json
-subforge transcribe video.mp4 --language ar
+cuewright transcribe video.mp4 --language ar
 
 # 2. Emit a translation skeleton, one "[id] text" line per segment
-subforge template video.ar.segments.json -o video.tr.txt --with-source
+cuewright template video.ar.segments.json -o video.tr.txt --with-source
 
 # 3. Translate the text in video.tr.txt however you like, keeping the [id] markers
 
 # 4. Build the subtitle file — timings come from the segments, text from your file
-subforge build video.ar.segments.json video.tr.txt video.tr.srt
+cuewright build video.ar.segments.json video.tr.txt video.tr.srt
 
 # 5. Optionally render it into the picture
-subforge burn video.mp4 video.tr.srt video.tr.mp4
+cuewright burn video.mp4 video.tr.srt video.tr.mp4
 ```
 
 Step 4 refuses to write anything if the ids do not line up exactly. That is
@@ -62,7 +60,7 @@ which is far harder to spot than an error at build time.
 For subtitles in the source language, skip steps 2–4:
 
 ```bash
-subforge export video.ar.segments.json video.ar.vtt
+cuewright export video.ar.segments.json video.ar.vtt
 ```
 
 ## Verifying the result
@@ -74,7 +72,7 @@ silence. `verify` finds every stretch the segments do not cover and measures its
 audio level — a gap carrying speech-level sound is worth listening to.
 
 ```bash
-subforge verify video.ar.segments.json video.mp4
+cuewright verify video.ar.segments.json video.mp4
 ```
 
 ```
@@ -91,8 +89,8 @@ then compare. Where the passes agree the transcript is dependable; where they
 diverge the model was unsure.
 
 ```bash
-subforge transcribe video.mp4 --language ar --no-vad --tag check
-subforge compare video.ar.segments.json video.check.segments.json
+cuewright transcribe video.mp4 --language ar --no-vad --tag check
+cuewright compare video.ar.segments.json video.check.segments.json
 ```
 
 ```
@@ -113,7 +111,7 @@ Proper nouns and numbers still deserve a human ear.
 Finally, validate the subtitle file itself — numbering, overlaps, line lengths:
 
 ```bash
-subforge check video.tr.srt
+cuewright check video.tr.srt
 ```
 
 ## Subtitle formatting
@@ -127,8 +125,8 @@ conjunction at the end of a block.
 ## Using it as a library
 
 ```python
-from subforge import SegmentFile, transcribe, verify, write_srt
-from subforge.transcribe import TranscribeOptions
+from cuewright import SegmentFile, transcribe, verify, write_srt
+from cuewright.transcribe import TranscribeOptions
 
 result = transcribe("video.mp4", TranscribeOptions(model="large-v3", language="ar"))
 result.save("video.segments.json")
@@ -151,7 +149,7 @@ print(f"coverage {report.coverage:.1%}, {len(report.anomalies)} anomalies")
 | `compare` | Cross-check two transcription passes |
 | `check` | Validate SRT structure |
 
-Run `subforge <command> --help` for the full set of options.
+Run `cuewright <command> --help` for the full set of options.
 
 ## Notes on quality
 
@@ -167,8 +165,8 @@ Run `subforge <command> --help` for the full set of options.
 ## Development
 
 ```bash
-git clone https://github.com/habibkaratas/subforge
-cd subforge
+git clone https://github.com/habibkaratas/cuewright
+cd cuewright
 pip install -e ".[dev]"
 pytest
 ruff check .

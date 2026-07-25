@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Transcription quality issues are usually easier to diagnose with the
-        output of `subforge verify` and `subforge check`, so please include
+        output of `cuewright verify` and `cuewright check`, so please include
         them where relevant.
 
   - type: textarea
@@ -21,7 +21,7 @@ body:
     id: repro
     attributes:
       label: Commands you ran
-      description: The exact `subforge` invocations, in order.
+      description: The exact `cuewright` invocations, in order.
       render: shell
     validations:
       required: true
@@ -36,8 +36,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: subforge version
-      description: Output of `subforge --version`
+      label: cuewright version
+      description: Output of `cuewright --version`
     validations:
       required: true
 

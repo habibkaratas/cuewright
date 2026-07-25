@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "subforge"
+name = "cuewright"
 dynamic = ["version"]
 description = "Transcribe speech, translate it, and produce verified subtitles."
 readme = "README.md"
@@ -34,17 +34,17 @@ dev = [
 ]
 
 [project.scripts]
-subforge = "subforge.cli:main"
+cuewright = "cuewright.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/habibkaratas/subforge"
-Issues = "https://github.com/habibkaratas/subforge/issues"
+Homepage = "https://github.com/habibkaratas/cuewright"
+Issues = "https://github.com/habibkaratas/cuewright/issues"
 
 [tool.hatch.version]
-path = "src/subforge/__init__.py"
+path = "src/cuewright/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/subforge"]
+packages = ["src/cuewright"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

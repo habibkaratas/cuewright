@@ -252,10 +252,10 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="subforge",
+        prog="cuewright",
         description="Transcribe speech, translate it, and produce verified subtitles.",
     )
-    parser.add_argument("--version", action="version", version=f"subforge {__version__}")
+    parser.add_argument("--version", action="version", version=f"cuewright {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("transcribe", help="speech -> timestamped segments + SRT")

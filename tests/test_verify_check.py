@@ -6,10 +6,10 @@ handed a media file, so the structural half of it stays unit-testable.
 
 from __future__ import annotations
 
-from subforge.check import check_srt
-from subforge.compare import compare, normalise
-from subforge.segments import Segment, SegmentFile
-from subforge.verify import verify
+from cuewright.check import check_srt
+from cuewright.compare import compare, normalise
+from cuewright.segments import Segment, SegmentFile
+from cuewright.verify import verify
 
 
 def make(segments, duration=60.0):

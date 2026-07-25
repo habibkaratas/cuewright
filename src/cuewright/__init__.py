@@ -1,4 +1,4 @@
-"""subforge — transcribe speech, translate it, and produce verified subtitles.
+"""cuewright — transcribe speech, translate it, and produce verified subtitles.
 
 The pipeline keeps timing and wording in separate files. Transcription writes
 timestamps once; every language track then supplies only text, keyed by segment

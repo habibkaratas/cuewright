@@ -33,5 +33,5 @@ First release.
   scoring fallback cut points so a number is never separated from its unit and a
   conjunction is never stranded at the end of a block.
 
-[Unreleased]: https://github.com/habibkaratas/subforge/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/habibkaratas/subforge/releases/tag/v0.1.0
+[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.0

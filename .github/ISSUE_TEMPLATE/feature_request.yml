@@ -20,7 +20,7 @@ body:
     id: alternatives
     attributes:
       label: Alternatives you considered
-      description: Including doing it outside subforge.
+      description: Including doing it outside cuewright.
 
   - type: checkboxes
     id: scope

@@ -1,13 +1,13 @@
 # Translating
 
-`subforge` does not translate for you. It gives you a file to translate and checks
+`cuewright` does not translate for you. It gives you a file to translate and checks
 that what comes back still lines up with the video. Use a human translator, a machine
 service, or an LLM — the workflow is the same.
 
 ```bash
-subforge template video.ar.segments.json -o video.tr.txt --with-source
+cuewright template video.ar.segments.json -o video.tr.txt --with-source
 # translate the text in video.tr.txt, keeping every [id] marker
-subforge build video.ar.segments.json video.tr.txt video.tr.srt
+cuewright build video.ar.segments.json video.tr.txt video.tr.srt
 ```
 
 ## Rules that matter
@@ -42,7 +42,7 @@ percentages, dates, job counts.
 ## Checking your work
 
 ```bash
-subforge check video.tr.srt
+cuewright check video.tr.srt
 ```
 
 Look at `longest block`. If it exceeds 84 characters the splitter could not find a
@@ -53,7 +53,7 @@ Reviewing timing is easiest against the source-language file, since both share t
 same timestamps:
 
 ```bash
-subforge export video.ar.segments.json video.ar.srt
+cuewright export video.ar.segments.json video.ar.srt
 ```
 
 ## Fixing a transcription error

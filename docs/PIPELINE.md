@@ -52,11 +52,11 @@ if they do not match exactly — missing, unknown, duplicated or empty. This is
 deliberate. A single skipped line would shift every later cue onto the wrong shot,
 and that is much harder to notice than an error at build time.
 
-Generate the skeleton with `subforge template`, optionally prefilled with the source
+Generate the skeleton with `cuewright template`, optionally prefilled with the source
 text to translate against:
 
 ```bash
-subforge template video.ar.segments.json -o video.tr.txt --with-source
+cuewright template video.ar.segments.json -o video.tr.txt --with-source
 ```
 
 ## From segments to cues
@@ -81,5 +81,5 @@ nothing needs transcribing again — only the burn is repeated, with the font sc
 proportion:
 
 ```bash
-subforge burn master-1080p.mp4 video.tr.srt out.mp4 --font-size 50
+cuewright burn master-1080p.mp4 video.tr.srt out.mp4 --font-size 50
 ```

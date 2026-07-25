@@ -3,7 +3,7 @@
 ffmpeg is an external dependency, not a Python package, so it has to be found
 at runtime. Resolution order:
 
-1. ``SUBFORGE_FFMPEG`` / ``SUBFORGE_FFPROBE`` environment variables
+1. ``CUEWRIGHT_FFMPEG`` / ``CUEWRIGHT_FFPROBE`` environment variables
 2. ``ffmpeg`` / ``ffprobe`` on ``PATH``
 3. A ``tools/`` directory next to the project root (where a downloaded static
    build is commonly unpacked on Windows)
@@ -35,7 +35,7 @@ ffmpeg is required but was not found.
   macOS   : brew install ffmpeg
   Debian  : sudo apt install ffmpeg
 
-Alternatively set SUBFORGE_FFMPEG=/path/to/ffmpeg (and SUBFORGE_FFPROBE)."""
+Alternatively set CUEWRIGHT_FFMPEG=/path/to/ffmpeg (and CUEWRIGHT_FFPROBE)."""
 
 
 def _search_tools_dir(name: str) -> str | None:
@@ -70,11 +70,11 @@ def _resolve(name: str, env_var: str) -> str:
 
 
 def ffmpeg_path() -> str:
-    return _resolve("ffmpeg", "SUBFORGE_FFMPEG")
+    return _resolve("ffmpeg", "CUEWRIGHT_FFMPEG")
 
 
 def ffprobe_path() -> str:
-    return _resolve("ffprobe", "SUBFORGE_FFPROBE")
+    return _resolve("ffprobe", "CUEWRIGHT_FFPROBE")
 
 
 def run(

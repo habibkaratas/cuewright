@@ -1,4 +1,4 @@
-"""Entry point for ``python -m subforge``."""
+"""Entry point for ``python -m cuewright``."""
 
 import sys
 

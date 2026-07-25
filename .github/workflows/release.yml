@@ -24,7 +24,7 @@ jobs:
       - name: Verify the tag matches the package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          VERSION=$(grep -oP '__version__ = "\K[^"]+' src/subforge/__init__.py)
+          VERSION=$(grep -oP '__version__ = "\K[^"]+' src/cuewright/__init__.py)
           if [ "$TAG" != "$VERSION" ]; then
             echo "tag $TAG does not match __version__ $VERSION" >&2
             exit 1
@@ -45,7 +45,15 @@ jobs:
           generate_release_notes: true
           files: dist/*
 
-# No PyPI publish step: the name "subforge" is taken on PyPI by an unrelated
-# package. Distribution is via GitHub releases and `pip install git+https://...`.
-# To publish, rename the project in pyproject.toml first, then add a job using
-# pypa/gh-action-pypi-publish with `permissions: id-token: write`.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # trusted publishing, no API token needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

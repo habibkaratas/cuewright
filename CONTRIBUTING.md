@@ -5,8 +5,8 @@ Thanks for taking the time. This project is small enough that a short guide cove
 ## Setup
 
 ```bash
-git clone https://github.com/habibkaratas/subforge
-cd subforge
+git clone https://github.com/habibkaratas/cuewright
+cd cuewright
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest
@@ -59,10 +59,7 @@ oversells itself is worse than no check, because it invites misplaced confidence
 
 ## Releasing
 
-Maintainers: bump `__version__` in `src/subforge/__init__.py`, update `CHANGELOG.md`,
+Maintainers: bump `__version__` in `src/cuewright/__init__.py`, update `CHANGELOG.md`,
 then tag `vX.Y.Z`. The release workflow verifies the tag matches the version, builds
-the sdist and wheel, and drafts a GitHub release with them attached.
-
-There is no PyPI step: `subforge` is taken on PyPI by an unrelated package, so the
-distribution channel is GitHub releases and `pip install git+https://…`. Publishing
-would mean renaming the project first.
+the sdist and wheel, drafts a GitHub release with them attached, and publishes to
+PyPI via trusted publishing.

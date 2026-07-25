@@ -70,13 +70,13 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: ffmpeg is discoverable
-        run: python -c "from subforge.ffmpeg import ffmpeg_path, ffprobe_path; print(ffmpeg_path(), ffprobe_path())"
+        run: python -c "from cuewright.ffmpeg import ffmpeg_path, ffprobe_path; print(ffmpeg_path(), ffprobe_path())"
 
       - name: Build and burn a synthetic clip
         run: |
           ffmpeg -y -f lavfi -i testsrc=size=320x240:rate=10:duration=4 \
                  -f lavfi -i anullsrc=r=44100:cl=stereo -shortest clip.mp4
           printf '1\n00:00:00,000 --> 00:00:02,000\nhello world\n\n2\n00:00:02,000 --> 00:00:04,000\nsecond cue\n' > subs.srt
-          subforge check subs.srt
-          subforge burn clip.mp4 subs.srt out.mp4
+          cuewright check subs.srt
+          cuewright burn clip.mp4 subs.srt out.mp4
           test -s out.mp4
