@@ -7,6 +7,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `enhance` extracts the audio track of a video untouched and writes an enhanced copy
+  beside it. Directories are scanned recursively; files without an audio track are
+  reported and skipped rather than aborting the run.
+- Two enhancement profiles. `transcribe` (default) prepares audio for Whisper: steep
+  high-pass, FFT noise reduction with noise tracking, gentle compression and
+  RMS-targeted normalisation. `listen` prepares far-field, low-bitrate audio for a
+  human ear: speech band only, non-local-means denoising, hard compression that
+  squashes door slams to voice level, presence lift, EBU R128 loudness, and an
+  optional pitch-preserving `--tempo`. A flag that belongs to the other profile is
+  refused instead of silently ignored.
+- `spectrogram` renders the audio track, or a window of it, as a PNG. It reveals
+  speech that voice-activity detection and transcription both miss.
+- `verify` flags likely hallucinations. `boilerplate` marks stock phrases Whisper
+  invents over noise ("Altyazı M.K.", "Thank you for watching", "Продолжение
+  следует…", "Дякую за перегляд"), matched after folding case and accents.
+  `no-speech` marks segments the model itself rated at least 60% likely to be
+  non-speech, which catches invented sentences no phrase list could anticipate.
+- Segment files carry each segment's `no_speech_prob` and `avg_logprob`. Older files
+  without them still load.
+- Library API: `probe_audio`, `extract_audio`, `enhance_audio`, `audio_level`,
+  `TranscribeProfile`, `ListenProfile`, `render_spectrogram`.
+
+### Changed
+
+- `verify` measures audio levels through `cuewright.audio.audio_level`, shared with
+  `enhance`, instead of its own private helper.
+
 ## [0.2.1] — 2026-07-25
 
 ### Fixed

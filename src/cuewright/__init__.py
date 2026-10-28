@@ -10,22 +10,45 @@ from __future__ import annotations
 
 __version__ = "0.2.1"
 
+from .audio import (
+    AudioLevel,
+    AudioStream,
+    NoAudioStream,
+    audio_level,
+    enhance_audio,
+    extract_audio,
+    probe_audio,
+)
 from .burn import BurnStyle, burn
 from .check import SrtReport, check_srt
 from .compare import CompareReport, compare
+from .profiles import ListenProfile, ProfileError, TranscribeProfile
 from .segments import Segment, SegmentFile, TranslationError, load_translation
+from .spectrogram import SpectrogramOptions, render_spectrogram
 from .srt import Cue, line_budget, read_srt, split_block, to_vtt, wrap, write_srt
 from .transcribe import TranscribeOptions, transcribe
 from .verify import VerifyReport, verify
 
 __all__ = [
     "__version__",
+    "AudioLevel",
+    "AudioStream",
+    "NoAudioStream",
+    "audio_level",
+    "enhance_audio",
+    "extract_audio",
+    "probe_audio",
     "BurnStyle",
     "burn",
     "SrtReport",
     "check_srt",
     "CompareReport",
     "compare",
+    "ListenProfile",
+    "ProfileError",
+    "TranscribeProfile",
+    "SpectrogramOptions",
+    "render_spectrogram",
     "Segment",
     "SegmentFile",
     "TranslationError",

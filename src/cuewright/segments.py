@@ -28,6 +28,8 @@ class Segment:
     start: float
     end: float
     text: str
+    no_speech_prob: float | None = None
+    avg_logprob: float | None = None
 
 
 @dataclass

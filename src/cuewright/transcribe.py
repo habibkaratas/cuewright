@@ -70,7 +70,14 @@ def transcribe(media, options: TranscribeOptions | None = None, progress=None) -
         text = raw.text.strip()
         if not text:
             continue
-        segment = Segment(id=len(segments) + 1, start=raw.start, end=raw.end, text=text)
+        segment = Segment(
+            id=len(segments) + 1,
+            start=raw.start,
+            end=raw.end,
+            text=text,
+            no_speech_prob=raw.no_speech_prob,
+            avg_logprob=raw.avg_logprob,
+        )
         segments.append(segment)
         if progress:
             fraction = min(raw.end / info.duration, 1.0) if info.duration else 0.0

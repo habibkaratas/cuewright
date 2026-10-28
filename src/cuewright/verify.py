@@ -13,11 +13,11 @@ word consistently will pass both. They narrow down where a human should listen.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
-from .ffmpeg import run
-from .segments import SegmentFile
+from .audio import audio_level
+from .hallucinations import NO_SPEECH_LIMIT, is_boilerplate
+from .segments import Segment, SegmentFile
 
 __all__ = ["Gap", "Anomaly", "VerifyReport", "verify"]
 
@@ -26,9 +26,6 @@ LOUD_MARGIN = 12.0  # dB below reference that still counts as speech-level
 FAST_CPS = 25.0
 SLOW_CPS = 3.0
 LONG_SEGMENT = 15.0
-
-_MEAN = re.compile(r"mean_volume:\s*(-?[\d.]+) dB")
-_MAX = re.compile(r"max_volume:\s*(-?[\d.]+) dB")
 
 
 @dataclass
@@ -73,32 +70,6 @@ class VerifyReport:
         return not self.suspicious_gaps and not self.anomalies
 
 
-def _measure(media: str, start: float, duration: float):
-    """Mean and peak level of an interval, in dBFS."""
-    stderr = run(
-        [
-            "-hide_banner",
-            "-nostats",
-            "-ss",
-            f"{start:.3f}",
-            "-t",
-            f"{duration:.3f}",
-            "-i",
-            str(media),
-            "-map",
-            "0:a:0",
-            "-af",
-            "volumedetect",
-            "-f",
-            "null",
-            "-",
-        ],
-    ).stderr.decode("utf-8", "replace")
-    mean = _MEAN.search(stderr)
-    peak = _MAX.search(stderr)
-    return (float(mean.group(1)) if mean else None, float(peak.group(1)) if peak else None)
-
-
 def verify(segments: SegmentFile, media: str | None = None) -> VerifyReport:
     """Inspect a transcript; measures audio levels when ``media`` is given."""
     segs = segments.segments
@@ -117,11 +88,11 @@ def verify(segments: SegmentFile, media: str | None = None) -> VerifyReport:
 
     if media and gaps:
         first = segs[0]
-        report.reference_db, _ = _measure(
-            media, first.start, min(20.0, first.end - first.start + 15)
-        )
+        reference = audio_level(media, first.start, min(20.0, first.end - first.start + 15))
+        report.reference_db = reference.mean_db
         for gap in gaps:
-            gap.mean_db, gap.peak_db = _measure(media, gap.start, gap.duration)
+            level = audio_level(media, gap.start, gap.duration)
+            gap.mean_db, gap.peak_db = level.mean_db, level.peak_db
             if (
                 gap.mean_db is not None
                 and report.reference_db is not None
@@ -130,29 +101,58 @@ def verify(segments: SegmentFile, media: str | None = None) -> VerifyReport:
                 gap.suspicious = True
     report.gaps = gaps
 
-    # --- per-segment anomalies ---
+    report.anomalies = segment_anomalies(segs)
+    return report
+
+
+def _rate_anomalies(seg: Segment) -> list[Anomaly]:
+    duration = seg.end - seg.start
+    cps = len(seg.text) / duration if duration > 0 else 0.0
+    found: list[Anomaly] = []
+    if cps > FAST_CPS:
+        found.append(Anomaly(seg.id, "fast", f"{cps:.1f} chars/s — timing may be too tight"))
+    if cps < SLOW_CPS and duration > 5:
+        found.append(
+            Anomaly(seg.id, "slow", f"{cps:.1f} chars/s over {duration:.1f}s — text may be missing")
+        )
+    if duration > LONG_SEGMENT:
+        found.append(Anomaly(seg.id, "long", f"{duration:.1f}s — should be split"))
+    return found
+
+
+def _hallucination_anomalies(seg: Segment) -> list[Anomaly]:
+    found: list[Anomaly] = []
+    if is_boilerplate(seg.text):
+        found.append(
+            Anomaly(
+                seg.id,
+                "boilerplate",
+                f"{seg.text!r} is a stock phrase Whisper invents over noise; "
+                "listen before trusting it",
+            )
+        )
+    if seg.no_speech_prob is not None and seg.no_speech_prob >= NO_SPEECH_LIMIT:
+        found.append(
+            Anomaly(
+                seg.id,
+                "no-speech",
+                f"the model rated this {seg.no_speech_prob:.0%} likely to be non-speech",
+            )
+        )
+    return found
+
+
+def segment_anomalies(segs: list[Segment]) -> list[Anomaly]:
+    anomalies: list[Anomaly] = []
     for i, seg in enumerate(segs):
-        duration = seg.end - seg.start
-        cps = len(seg.text) / duration if duration > 0 else 0.0
         if i and seg.text == segs[i - 1].text:
-            report.anomalies.append(
+            anomalies.append(
                 Anomaly(
                     seg.id,
                     "repeat",
                     "identical to the previous segment (possible hallucination loop)",
                 )
             )
-        if cps > FAST_CPS:
-            report.anomalies.append(
-                Anomaly(seg.id, "fast", f"{cps:.1f} chars/s — timing may be too tight")
-            )
-        if cps < SLOW_CPS and duration > 5:
-            report.anomalies.append(
-                Anomaly(
-                    seg.id, "slow", f"{cps:.1f} chars/s over {duration:.1f}s — text may be missing"
-                )
-            )
-        if duration > LONG_SEGMENT:
-            report.anomalies.append(Anomaly(seg.id, "long", f"{duration:.1f}s — should be split"))
-
-    return report
+        anomalies += _rate_anomalies(seg)
+        anomalies += _hallucination_anomalies(seg)
+    return anomalies

@@ -82,6 +82,24 @@ jobs:
           cuewright burn clip.mp4 subs.srt out.mp4
           test -s out.mp4
 
+      - name: Enhance a noisy clip and refuse a mute one
+        run: |
+          ffmpeg -y -f lavfi -i "sine=frequency=300:sample_rate=8000:duration=3" \
+                 -f lavfi -i "anoisesrc=color=pink:amplitude=0.05:sample_rate=8000:duration=3" \
+                 -filter_complex amix=inputs=2 noisy.wav
+          cuewright enhance noisy.wav --format flac
+          test -s noisy.audio.wav
+          test -s noisy.clean.flac
+          cuewright enhance noisy.wav --profile listen --tempo 0.8 --clean-only
+          test -s noisy.listen.wav
+          if cuewright enhance noisy.wav --profile listen --denoise 10; then
+            echo "a transcribe-only flag must be refused for the listen profile"; exit 1
+          fi
+          cuewright spectrogram noisy.wav --start 1 --duration 1
+          test -s noisy.1s-2s.spectrogram.png
+          ffmpeg -y -f lavfi -i testsrc=size=64x64:rate=5:duration=1 mute.mp4
+          if cuewright enhance mute.mp4; then echo "a mute clip must fail"; exit 1; fi
+
       - name: Transcribe real speech end to end
         # The flagship command once shipped broken because nothing here ever
         # ran it: the unit tests do not touch the model and the burn test does

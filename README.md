@@ -139,6 +139,76 @@ text — but an explicit code gives better splits.
 See [docs/LANGUAGES.md](docs/LANGUAGES.md) for the full picture, including which
 languages the transcriber handles and how to add one to the formatter.
 
+## Cleaning up audio
+
+Security-camera and phone recordings arrive at 8 kHz with hum, hiss and a voice buried
+under door slams. `enhance` pulls the track out of each video and writes it beside the
+video twice: once copied untouched, and once cleaned for a purpose you choose.
+
+```bash
+cuewright enhance video/                          # every file under the folder
+cuewright enhance clip.mp4 --profile listen --tempo 0.8 --format flac
+```
+
+```
+video/clip.mp4  [aac 8000 Hz 1 ch]
+  raw      -> video/clip.audio.m4a
+  clean    -> video/clip.clean.wav
+  level mean -38.2 dB, peak 0.0 dB  ->  mean -27.6 dB, peak -0.3 dB  (14s)
+skip  video/other.mp4  (no audio track)
+
+1 file(s) enhanced, 1 without an audio track
+```
+
+There are two profiles, because a model and a person need different things:
+
+- **`transcribe`** (default, writes `.clean`) keeps the full band for Whisper: a steep
+  200 Hz high-pass, FFT noise reduction that tracks a drifting noise floor, gentle
+  compression and RMS-targeted normalisation.
+- **`listen`** (writes `.listen`) is for a human ear on far-field, low-bitrate audio.
+  It keeps only the 250-3400 Hz speech band, removes noise with non-local means,
+  squashes door slams and footsteps down to voice level with a hard compressor, adds a
+  presence lift and normalises loudness. `--tempo 0.8` slows it with the pitch kept,
+  which gives the ear more time per syllable; the result no longer lines up with the
+  video.
+
+The listen profile exists because of a real case. Ceiling-camera recordings at 8 kHz
+and 15 kbps contained voices that people could hear but no model could decode:
+voice-activity detection dropped them and Whisper returned only stock phrases.
+Squashing the bursts that drown the voice made the speech stand out for listeners
+even though the words stayed out of the model's reach.
+
+Every stage is tunable; `cuewright enhance --help` lists which flags belong to which
+profile, and a flag given to the wrong profile is refused rather than ignored.
+
+| Flag | Profile | Default | What it does |
+| --- | --- | --- | --- |
+| `--highpass` | both | 200 / 250 | Hz below which rumble is cut; `0` disables |
+| `--rate` | both | 16000 | output sample rate |
+| `--denoise` | transcribe | 18 | dB of noise reduction; `0` disables |
+| `--noise-floor` | transcribe | -45 | dB; initial noise-floor estimate, tracked from there |
+| `--max-gain` | transcribe | 26 | dB; cap on how far quiet passages are raised |
+| `--target-rms` | transcribe | 0.2 | loudness quiet passages are raised towards |
+| `--lowpass` | listen | 3400 | Hz above which hiss is cut; `0` disables |
+| `--tempo` | listen | 1 | playback speed 0.5-2.0, pitch preserved |
+
+Files without an audio track are listed and skipped; the command fails only when none
+of its inputs had one.
+
+## Looking at the audio
+
+When the tools disagree with your ears, look. `spectrogram` renders the audio track as
+a picture: voices show up as stacked horizontal harmonics, door slams and footsteps as
+vertical bursts.
+
+```bash
+cuewright spectrogram clip.mp4 --start 72 --duration 16
+# clip.72s-88s.spectrogram.png
+```
+
+The frequency axis stops at 4 kHz by default, which covers telephone-band and camera
+audio; raise it with `--max-hz` for full-band recordings.
+
 ## Using it as a library
 
 ```python
@@ -157,12 +227,14 @@ print(f"coverage {report.coverage:.1%}, {len(report.anomalies)} anomalies")
 
 | Command | Purpose |
 | --- | --- |
+| `enhance` | Extract the audio track and clean it up for transcription or listening |
+| `spectrogram` | Render the audio as a time-frequency picture |
 | `transcribe` | Speech to timestamped segments and an SRT |
 | `template` | Translation skeleton (`[id] text` per segment) |
 | `build` | Segments plus a translation to SRT or VTT |
 | `export` | Segments to SRT or VTT in the source language |
 | `burn` | Render subtitles into the picture |
-| `verify` | Find dropped speech and implausible segments |
+| `verify` | Find dropped speech, implausible segments and likely hallucinations |
 | `compare` | Cross-check two transcription passes |
 | `check` | Validate SRT structure |
 

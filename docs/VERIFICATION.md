@@ -45,6 +45,23 @@ It also reports per-segment anomalies computed from the data alone:
 | `fast` | Over 25 characters/second — timing is probably too tight |
 | `slow` | Under 3 characters/second across a long segment — text may be missing |
 | `long` | Over 15 seconds — should be split into more cues |
+| `boilerplate` | A stock phrase Whisper invents over silence or noise — listen before trusting it |
+| `no-speech` | The model itself rated the segment at least 60% likely to be non-speech |
+
+The last two target hallucination directly. Whisper was trained on a great deal of
+subtitled video, so over noise it tends to produce the phrases those videos end with:
+"Altyazı M.K.", "İzlediğiniz için teşekkür ederim", "Thank you for watching",
+"Продолжение следует…", "Дякую за перегляд". `boilerplate` matches them after folding
+case and accents, either as the whole segment or, for subtitle credits, anywhere in it.
+
+A phrase list cannot anticipate everything. On a silent ceiling-camera recording the
+`small` model invented "So, I'm going to give you a talk about the issues of the
+world"; no list contains that, but the model had rated the stretch 87% likely to be
+non-speech, and `no-speech` reports exactly that. Segment files written before
+cuewright recorded these scores simply skip the check.
+
+**The limit:** a genuine "thank you" said on camera is flagged too. Both checks mean
+"listen here", never "delete this".
 
 ## 2. Misheard words — `cuewright compare`
 

@@ -13,14 +13,29 @@ import time
 from pathlib import Path
 
 from . import __version__
+from .audio import (
+    ENHANCED_CODECS,
+    AudioLevel,
+    audio_level,
+    enhance_audio,
+    extract_audio,
+    probe_audio,
+    raw_container_for,
+)
 from .burn import BurnStyle, burn
 from .check import check_srt
 from .compare import compare
 from .ffmpeg import FFmpegNotFound
+from .media_scan import collect_media, mirrored_folder
+from .profiles import PROFILES, ListenProfile, Profile, ProfileError, TranscribeProfile
 from .segments import SegmentFile, TranslationError, load_translation
+from .spectrogram import SpectrogramOptions, render_spectrogram
 from .srt import Cue, format_timestamp, to_vtt, write_srt
 from .transcribe import TranscribeOptions, transcribe
 from .verify import verify
+
+RAW_TAG = "audio"
+OUTPUT_TAGS = (RAW_TAG, *(profile.tag for profile in PROFILES.values()))
 
 
 def _stem(path: Path) -> str:
@@ -261,6 +276,245 @@ def cmd_check(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 
 
+def is_enhance_output(path: Path) -> bool:
+    return path.stem.endswith(tuple(f".{tag}" for tag in OUTPUT_TAGS))
+
+
+def output_paths(
+    media: Path, folder: Path, fmt: str, raw_suffix: str, tag: str
+) -> tuple[Path, Path]:
+    raw = folder / f"{media.stem}.{RAW_TAG}{raw_suffix}"
+    enhanced = folder / f"{media.stem}.{tag}.{fmt}"
+    return raw, enhanced
+
+
+PROFILE_FLAGS = {
+    "highpass": "highpass_hz",
+    "rate": "sample_rate",
+    "denoise": "noise_reduction_db",
+    "noise_floor": "noise_floor_db",
+    "max_gain": "max_gain_db",
+    "target_rms": "target_rms",
+    "lowpass": "lowpass_hz",
+    "tempo": "tempo",
+}
+
+
+def build_profile(args: argparse.Namespace) -> Profile:
+    profile_type = PROFILES[args.profile]
+    accepted = profile_type.__dataclass_fields__
+    overrides: dict[str, float] = {}
+    rejected: list[str] = []
+    for flag, field_name in PROFILE_FLAGS.items():
+        value = getattr(args, flag)
+        if value is None:
+            continue
+        if field_name not in accepted:
+            rejected.append("--" + flag.replace("_", "-"))
+            continue
+        overrides[field_name] = value
+    if rejected:
+        raise ProfileError(
+            f"{', '.join(rejected)} cannot be used with the {args.profile!r} profile; "
+            "see 'cuewright enhance --help'"
+        )
+    return profile_type(**overrides)
+
+
+def _describe_level(level: AudioLevel) -> str:
+    if level.mean_db is None or level.peak_db is None:
+        return "not measured"
+    return f"mean {level.mean_db:.1f} dB, peak {level.peak_db:.1f} dB"
+
+
+def _enhance_one(media: Path, outputs: tuple[Path, Path], profile: Profile, keep_raw: bool) -> None:
+    raw_path, enhanced_path = outputs
+    started = time.monotonic()
+    if keep_raw:
+        extract_audio(media, raw_path)
+        print(f"  raw      -> {raw_path}", flush=True)
+    enhance_audio(media, enhanced_path, profile)
+    print(f"  {profile.tag:8s} -> {enhanced_path}", flush=True)
+    before, after = audio_level(media), audio_level(enhanced_path)
+    elapsed = time.monotonic() - started
+    print(f"  level {_describe_level(before)}  ->  {_describe_level(after)}  ({elapsed:.0f}s)")
+
+
+def cmd_enhance(args: argparse.Namespace) -> int:
+    profile = build_profile(args)
+    out_dir = Path(args.out_dir) if args.out_dir else None
+    enhanced = 0
+    silent = 0
+    for root, media in collect_media(args.media, exclude=is_enhance_output):
+        stream = probe_audio(media)
+        if stream is None:
+            silent += 1
+            print(f"skip  {media}  (no audio track)", flush=True)
+            continue
+        print(f"{media}  [{stream.codec} {stream.sample_rate} Hz {stream.channels} ch]", flush=True)
+        folder = mirrored_folder(media, root, out_dir)
+        outputs = output_paths(media, folder, args.format, raw_container_for(stream), profile.tag)
+        _enhance_one(media, outputs, profile, keep_raw=not args.clean_only)
+        enhanced += 1
+    print(f"\n{enhanced} file(s) enhanced, {silent} without an audio track")
+    if not enhanced:
+        print("error: none of the inputs carries an audio track", file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_spectrogram(args: argparse.Namespace) -> int:
+    options = SpectrogramOptions(
+        start=args.start,
+        duration=args.duration,
+        max_hz=args.max_hz,
+        width=args.width,
+        height=args.height,
+        log_scale=not args.linear,
+    )
+    print(render_spectrogram(args.media, args.output, options))
+    return 0
+
+
+ENHANCE_DESCRIPTION = """\
+Extract the first audio track of each input and write, next to it (or under
+--out-dir, mirroring the scanned folders):
+
+  <name>.audio.<codec>       the track copied untouched
+  <name>.clean.<format>      --profile transcribe (default): for Whisper
+  <name>.listen.<format>     --profile listen: for human ears
+
+transcribe  high-pass, FFT noise reduction with noise tracking, gentle
+            compression, RMS-targeted normalisation. Keeps the full band,
+            so it suits a second transcription pass.
+listen      speech band only (high-pass + low-pass), non-local-means
+            denoising, hard compression that squashes door slams and
+            footsteps down to voice level, presence boost, EBU R128
+            loudness. Built for far-field, low-bitrate recordings where
+            a person can still pick out words the model cannot.
+
+Directories are scanned recursively. Files with no audio track are listed
+and skipped; the command fails only when none of the inputs has one.
+Earlier outputs (.audio, .clean, .listen) are never fed back in."""
+
+
+def add_enhance_parser(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "enhance",
+        help="extract the audio track and clean it up for transcription or listening",
+        description=ENHANCE_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("media", nargs="+", help="media files or directories (scanned recursively)")
+    p.add_argument(
+        "--profile",
+        default="transcribe",
+        choices=sorted(PROFILES),
+        help="what the enhanced track is for (default: %(default)s)",
+    )
+    p.add_argument("--out-dir", default=None, help="defaults to each media file's own folder")
+    p.add_argument(
+        "--format",
+        default="wav",
+        choices=sorted(ENHANCED_CODECS),
+        help="container for the enhanced track: wav (16-bit PCM), flac (lossless) or "
+        "m4a (AAC, smallest) (default: %(default)s)",
+    )
+    p.add_argument("--clean-only", action="store_true", help="skip the untouched copy of the track")
+    transcribe, listen = TranscribeProfile(), ListenProfile()
+
+    shared = p.add_argument_group("both profiles")
+    shared.add_argument(
+        "--highpass",
+        type=int,
+        default=None,
+        help=f"Hz; rumble below this is cut, 0 disables "
+        f"(default: transcribe {transcribe.highpass_hz}, listen {listen.highpass_hz})",
+    )
+    shared.add_argument(
+        "--rate",
+        type=int,
+        default=None,
+        help=f"output sample rate (default: {transcribe.sample_rate})",
+    )
+
+    group = p.add_argument_group("transcribe profile only")
+    group.add_argument(
+        "--denoise",
+        type=float,
+        default=None,
+        help=f"dB of noise reduction, 0 disables (default: {transcribe.noise_reduction_db:g})",
+    )
+    group.add_argument(
+        "--noise-floor",
+        type=float,
+        default=None,
+        help=f"dB; starting estimate of the noise floor, tracked from there "
+        f"(default: {transcribe.noise_floor_db:g})",
+    )
+    group.add_argument(
+        "--max-gain",
+        type=float,
+        default=None,
+        help=f"dB; cap on how far quiet passages are raised (default: {transcribe.max_gain_db:g})",
+    )
+    group.add_argument(
+        "--target-rms",
+        type=float,
+        default=None,
+        help=f"0-1; loudness quiet passages are raised towards "
+        f"(default: {transcribe.target_rms:g})",
+    )
+
+    group = p.add_argument_group("listen profile only")
+    group.add_argument(
+        "--lowpass",
+        type=int,
+        default=None,
+        help=f"Hz; hiss above this is cut, 0 disables (default: {listen.lowpass_hz})",
+    )
+    group.add_argument(
+        "--tempo",
+        type=float,
+        default=None,
+        help="playback speed 0.5-2.0, pitch preserved; 0.8 gives the ear more time per "
+        "syllable, but anything other than 1 no longer lines up with the video (default: 1)",
+    )
+    p.set_defaults(func=cmd_enhance)
+
+
+def add_spectrogram_parser(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "spectrogram",
+        help="render the audio as a time-frequency picture",
+        description="Render a PNG spectrogram of the first audio track. Voices show up as "
+        "stacked horizontal harmonics, door slams and footsteps as vertical bursts, so it "
+        "reveals speech that voice-activity detection and transcription miss. Without -o "
+        "the picture is written next to the media as "
+        "<name>[.<start>s-<end>].spectrogram.png.",
+    )
+    p.add_argument("media", help="any media file with an audio track")
+    p.add_argument("-o", "--output", default=None, help="PNG path")
+    defaults = SpectrogramOptions()
+    p.add_argument("--start", type=float, default=None, help="seconds into the media")
+    p.add_argument("--duration", type=float, default=None, help="seconds to render")
+    p.add_argument(
+        "--max-hz",
+        type=int,
+        default=defaults.max_hz,
+        help="top of the frequency axis; 4000 covers telephone-band and camera audio "
+        "(default: %(default)s)",
+    )
+    p.add_argument(
+        "--width", type=int, default=defaults.width, help="pixels (default: %(default)s)"
+    )
+    p.add_argument(
+        "--height", type=int, default=defaults.height, help="pixels (default: %(default)s)"
+    )
+    p.add_argument("--linear", action="store_true", help="linear amplitude scale instead of log")
+    p.set_defaults(func=cmd_spectrogram)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cuewright",
@@ -333,7 +587,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preset", default="medium")
     p.set_defaults(func=cmd_burn)
 
-    p = sub.add_parser("verify", help="find dropped speech and odd segments")
+    p = sub.add_parser(
+        "verify",
+        help="find dropped speech, odd segments and likely hallucinations",
+        description="Report coverage gaps, measured against the media's audio level when "
+        "it is given, and per-segment anomalies: repeat, fast, slow, long, boilerplate "
+        "(stock phrases Whisper invents over noise) and no-speech (segments the model "
+        "itself rated as probably not speech). Exits 1 when anything needs a listen.",
+    )
     p.add_argument("segments")
     p.add_argument(
         "media", nargs="?", default=None, help="source media; enables audio-level measurement"
@@ -355,6 +616,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=cmd_check)
 
+    add_enhance_parser(sub)
+    add_spectrogram_parser(sub)
+
     return parser
 
 
@@ -365,7 +629,7 @@ def main(argv: list[str] | None = None) -> int:
     except FFmpegNotFound as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 4
-    except (FileNotFoundError, RuntimeError, TranslationError) as exc:
+    except (FileNotFoundError, RuntimeError, TranslationError, ProfileError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
