@@ -31,6 +31,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Library API: `probe_audio`, `extract_audio`, `enhance_audio`, `audio_level`,
   `TranscribeProfile`, `ListenProfile`, `render_spectrogram`.
 
+### Fixed
+
+- `transcribe` failed on every fresh install with `TypeError: open() got an unexpected
+  keyword argument 'metadata_errors'`. PyAV 19 dropped that argument and
+  faster-whisper 1.2.1 still passes it; nothing constrained PyAV, so pip picked the
+  incompatible release. PyAV is now held below 19.
+
 ### Changed
 
 - `verify` measures audio levels through `cuewright.audio.audio_level`, shared with
