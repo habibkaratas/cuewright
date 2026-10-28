@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-10-28
+
 ### Added
 
 - `enhance` extracts the audio track of a video untouched and writes an enhanced copy
@@ -128,7 +130,8 @@ First release.
   scoring fallback cut points so a number is never separated from its unit and a
   conjunction is never stranded at the end of a block.
 
-[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/habibkaratas/cuewright/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.2
 [0.2.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.1
 [0.2.0]: https://github.com/habibkaratas/cuewright/releases/tag/v0.2.0
 [0.1.1]: https://github.com/habibkaratas/cuewright/releases/tag/v0.1.1
